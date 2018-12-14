@@ -5,7 +5,8 @@ class ChainingHashTableMap:
 
     def __init__(self, N=64, p=40206835204840513073):
         self.N = N
-        self.table = [unsorted_map.UnsortedArrayMap() for i in range(self.N)]
+        # self.table = [unsorted_map.UnsortedArrayMap() for i in range(self.N)]
+        self.table = [None for i in range(self.N)]
         self.n = 0
         self.p = p
         self.a = random.randrange(1, self.p - 1)
@@ -20,14 +21,32 @@ class ChainingHashTableMap:
     def __getitem__(self, key):
         i = self.hash_function(key)
         curr_bucket = self.table[i]
-        return curr_bucket[key]
+        if curr_bucket is None:
+            return None
+        elif isinstance(curr_bucket, unsorted_map.UnsortedArrayMap):
+            return curr_bucket[key]
+        else:
+            return curr_bucket.value
 
     def __setitem__(self, key, value):
         i = self.hash_function(key)
         curr_bucket = self.table[i]
-        old_size = len(curr_bucket)
-        curr_bucket[key] = value
-        new_size = len(curr_bucket)
+        if curr_bucket is None:
+            old_size = 0
+            new_item = unsorted_map.UnsortedArrayMap.Item(key, value)
+            self.table[i] = new_item
+            new_size = 1
+        elif isinstance(curr_bucket, unsorted_map.UnsortedArrayMap):
+            old_size = len(curr_bucket)
+            curr_bucket[key] = value
+            new_size = len(curr_bucket)
+        else:
+            old_size = 1
+            new_bucket = unsorted_map.UnsortedArrayMap()
+            new_bucket[curr_bucket.key] = curr_bucket.value
+            new_bucket[key] = new_bucket.value
+            self.table[i] = new_bucket
+            new_size = 2
         if (new_size > old_size):
             self.n += 1
         if (self.n > self.N):
@@ -36,15 +55,24 @@ class ChainingHashTableMap:
     def __delitem__(self, key):
         i = self.hash_function(key)
         curr_bucket = self.table[i]
-        del curr_bucket[key]
+        if curr_bucket is None:
+            raise Exception("Bucket is none")
+        elif isinstance(curr_bucket, unsorted_map.UnsortedArrayMap):
+            del curr_bucket[key]
+        else:
+            self.table[i] = None
         self.n -= 1
         if (self.n < self.N // 4):
             self.rehash(self.N // 2)
 
     def __iter__(self):
         for curr_bucket in self.table:
-            for key in curr_bucket:
-                yield key
+            if curr_bucket is not None:
+                if isinstance(curr_bucket, unsorted_map.UnsortedArrayMap):
+                    for key in curr_bucket:
+                        yield key
+                else:
+                    yield curr_bucket.key
 
     def rehash(self, new_size):
         old = [(key, self[key]) for key in self]
